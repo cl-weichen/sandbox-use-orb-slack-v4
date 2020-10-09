@@ -1,0 +1,51 @@
+version: 2.1
+
+orbs:
+  slack: circleci/slack@4
+
+executors:
+  ruby:
+    docker:
+      - image: circleci/ruby:2.6.6
+
+jobs:
+  preprocessing:
+    executor:
+      name: ruby
+    steps:
+      - checkout
+      - run: ruby preprocessing.rb
+  postprocessing:
+    executor:
+      name: ruby
+    steps:
+      - checkout
+      - run: ruby postprocessing.rb
+      - slack/notify:
+          event: fail
+          channel: 'try-orb-slack-v4'
+          template: basic_fail_1
+      - slack/notify:
+          event: pass
+          channel: 'try-orb-slack-v4'
+          template: success_tagged_deploy_1
+
+workflows:
+  version: 2
+  try-orb-slack-v4:
+    jobs:
+      - preprocessing
+      - slack/on-hold:
+          context: slack-secrets
+          channel: 'try-orb-slack-v4'
+          requires:
+            - preprocessing
+      - pause_workflow:
+          requires:
+            - preprocessing
+            - slack/on-hold
+          type: approval
+      - postprocessing:
+          context: slack-secrets
+          requires:
+            - pause_workflow
